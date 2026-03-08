@@ -1,0 +1,29 @@
+@import 'bootstrap/scss/bootstrap';
+
+body {
+  background-color: #f8f9fa;
+}
+
+.thumbnail-sm {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.thumbnail-placeholder {
+  width: 120px;
+  height: 68px;
+  border-radius: 4px;
+  background-color: #6c757d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.7rem;
+}
+
+.nav-link.active {
+  font-weight: 600;
+  text-decoration: underline;
+}
