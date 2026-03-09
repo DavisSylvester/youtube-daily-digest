@@ -35,6 +35,7 @@ export interface Video {
   thumbnailUrl: string | null;
   firstSeenAt: string;
   isShort: number;
+  defaultLanguage: string;
 }
 
 export interface VideosResponse {

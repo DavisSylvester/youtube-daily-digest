@@ -7,7 +7,6 @@ function todayString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** SQLite stores firstSeenAt as "2026-03-08 18:44:31" — normalize to ISO 8601 for DatePipe. */
 function normalizeVideo(v: Video): Video {
   return {
     ...v,
@@ -30,6 +29,7 @@ export class VideosStateService {
   readonly error = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly selectedDate = signal(todayString());
+  readonly englishOnly = signal(true);
 
   readonly filteredVideos = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
@@ -57,7 +57,7 @@ export class VideosStateService {
     this.error.set(null);
     const date = this.selectedDate();
     this.api
-      .getVideos(this.page(), this.pageSize(), date || undefined)
+      .getVideos(this.page(), this.pageSize(), date || undefined, this.englishOnly())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
@@ -75,6 +75,12 @@ export class VideosStateService {
 
   setSearchTerm(term: string): void {
     this.searchTerm.set(term);
+  }
+
+  toggleEnglishOnly(): void {
+    this.englishOnly.update((v) => !v);
+    this.page.set(1);
+    this.loadVideos();
   }
 
   onDateChange(date: string): void {

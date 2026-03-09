@@ -42,8 +42,12 @@ export class ApiService {
     return this.http.patch<TopicQuery>(`${this.base}/queries/${queryId}/toggle`, { isActive });
   }
 
-  getVideos(page = 1, pageSize = 50, date?: string): Observable<VideosResponse> {
-    const params: Record<string, string> = { page: String(page), pageSize: String(pageSize) };
+  getVideos(page = 1, pageSize = 50, date?: string, englishOnly = true): Observable<VideosResponse> {
+    const params: Record<string, string> = {
+      page: String(page),
+      pageSize: String(pageSize),
+      englishOnly: String(englishOnly),
+    };
     if (date) params['date'] = date;
     return this.http.get<VideosResponse>(`${this.base}/videos`, { params });
   }

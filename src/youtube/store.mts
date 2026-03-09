@@ -16,6 +16,7 @@ export function upsertVideo(video: FoundVideo): void {
       thumbnailUrl: video.thumbnailUrl ?? null,
       firstSeenAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
       isShort: video.isShort ? 1 : 0,
+      defaultLanguage: video.defaultLanguage,
     })
     .onConflictDoUpdate({
       target: videos.videoId,
@@ -28,6 +29,7 @@ export function upsertVideo(video: FoundVideo): void {
         description: sql`excluded.description`,
         thumbnailUrl: sql`excluded.thumbnail_url`,
         isShort: sql`excluded.is_short`,
+        defaultLanguage: sql`excluded.default_language`,
       },
     })
     .run();
