@@ -1,81 +1,73 @@
 <div class="d-flex align-items-center justify-content-between mb-3">
   <h2 class="mb-0 fs-5 fw-semibold">Search Queries</h2>
   <div class="d-flex gap-2">
-    <button class="btn btn-sm btn-outline-secondary" (click)="loadTopics()">Refresh</button>
-    <button class="btn btn-sm btn-danger" (click)="openNewTopicForm()">+ New Topic</button>
+    <button class="btn btn-sm btn-outline-secondary" (click)="state.loadTopics()">Refresh</button>
+    <button class="btn btn-sm btn-danger" (click)="state.openNewTopicForm()">+ New Topic</button>
   </div>
 </div>
 
-@if (showNewTopicForm) {
+@if (state.showNewTopicForm()) {
   <div class="card mb-3 border-danger shadow-sm">
     <div class="card-body py-2 px-3">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="fw-semibold small text-danger me-1">New Topic</span>
         <input
-          [(ngModel)]="newTopicName"
+          [ngModel]="state.newTopicName()"
+          (ngModelChange)="state.newTopicName.set($event)"
           class="form-control form-control-sm"
           style="max-width: 260px"
           placeholder="e.g. Agentic AI"
-          (keyup.enter)="saveTopic()"
-          (keyup.escape)="cancelNewTopic()"
+          (keyup.enter)="state.saveTopic()"
+          (keyup.escape)="state.cancelNewTopic()"
           autofocus
         />
         <button
-          (click)="saveTopic()"
+          (click)="state.saveTopic()"
           class="btn btn-sm btn-danger"
-          [disabled]="!newTopicName.trim() || savingTopic"
+          [disabled]="!state.newTopicName().trim() || state.savingTopic()"
         >
-          @if (savingTopic) {
+          @if (state.savingTopic()) {
             <span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving...
           } @else {
             Save &amp; Search
           }
         </button>
-        <button (click)="cancelNewTopic()" class="btn btn-sm btn-outline-secondary">Cancel</button>
+        <button (click)="state.cancelNewTopic()" class="btn btn-sm btn-outline-secondary">Cancel</button>
       </div>
     </div>
   </div>
 }
 
-@if (loading) {
+@if (state.loading()) {
   <div class="text-center py-5">
     <div class="spinner-border text-danger" role="status">
       <span class="visually-hidden">Loading...</span>
     </div>
   </div>
-} @else if (error) {
-  <div class="alert alert-danger">{{ error }}</div>
-} @else if (topics.length === 0) {
+} @else if (state.error()) {
+  <div class="alert alert-danger">{{ state.error() }}</div>
+} @else if (!state.hasTopics()) {
   <div class="alert alert-info">No topics found. Add one above.</div>
 } @else {
   <div class="card shadow-sm">
-    @for (topic of topics; track topic.id; let last = $last) {
-      <!-- Topic header row -->
+    @for (topic of state.topics(); track topic.id; let last = $last) {
       <div
         class="d-flex align-items-center gap-2 px-3 py-2 user-select-none"
-        [class.border-bottom]="!last || expandedTopicIds.has(topic.id)"
+        [class.border-bottom]="!last || state.isExpanded(topic.id)"
         style="cursor: pointer; min-height: 48px"
-        (click)="toggleExpand(topic.id)"
+        (click)="state.toggleExpand(topic.id)"
       >
-        <!-- Chevron -->
         <span class="text-muted" style="width: 14px; font-size: 0.7rem">
-          {{ expandedTopicIds.has(topic.id) ? '▼' : '▶' }}
+          {{ state.isExpanded(topic.id) ? '▼' : '▶' }}
         </span>
-
-        <!-- Name + slug -->
         <div class="flex-grow-1 d-flex align-items-baseline gap-2 overflow-hidden">
           <span class="fw-semibold text-truncate">{{ topic.name }}</span>
           <span class="text-muted font-monospace small text-truncate d-none d-sm-inline">{{ topic.slug }}</span>
         </div>
-
-        <!-- Stats + status -->
         <div class="d-flex align-items-center gap-2 flex-shrink-0" (click)="$event.stopPropagation()">
-          <!-- Video count -->
           <span class="badge bg-secondary" title="Total videos stored">
             {{ topic.videoCount }} vid{{ topic.videoCount === 1 ? '' : 's' }}
           </span>
-
-          <!-- Last run info -->
           @if (topic.lastRun) {
             <span
               class="badge"
@@ -86,24 +78,21 @@
               @if (topic.lastRun.status === 'running') {
                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
               }
-              {{ topic.lastRun.status }}
-              &middot;
-              {{ topic.lastRun.discoveredCount }} found
+              {{ topic.lastRun.status }} &middot; {{ topic.lastRun.discoveredCount }} found
             </span>
-            <span class="text-muted small d-none d-md-inline" title="Last run time">
+            <span class="text-muted small d-none d-md-inline">
               {{ topic.lastRun.finishedAt ?? topic.lastRun.startedAt | date:'MMM d, h:mm a' }}
             </span>
           } @else {
             <span class="text-muted small">never run</span>
           }
-
-          <!-- Active badge -->
-          <span class="badge" [class]="topic.isActive ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-secondary border'">
+          <span
+            class="badge"
+            [class]="topic.isActive ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-secondary border'"
+          >
             {{ topic.isActive ? 'active' : 'inactive' }}
           </span>
-
-          <!-- Run Search button -->
-          @if (searchingTopicIds.has(topic.id)) {
+          @if (state.isSearching(topic.id)) {
             <span class="badge bg-warning text-dark">
               <span class="spinner-border spinner-border-sm me-1" role="status"></span>Starting...
             </span>
@@ -112,56 +101,52 @@
               class="btn btn-sm btn-outline-danger py-0 px-2"
               style="font-size: 0.75rem"
               title="Run search now"
-              (click)="runSearch(topic.id)"
+              (click)="state.runSearch(topic.id)"
             >
-              ▶ Run
+              &#9654; Run
             </button>
           }
-
-          <!-- Add query button -->
           <button
             class="btn btn-sm btn-outline-secondary py-0 px-2"
             style="font-size: 0.75rem"
             title="Add a query"
-            (click)="startAdd(topic.id)"
+            (click)="state.startAdd(topic.id)"
           >
             + Query
           </button>
         </div>
       </div>
 
-      <!-- Expanded: query list + add form -->
-      @if (expandedTopicIds.has(topic.id)) {
+      @if (state.isExpanded(topic.id)) {
         <div class="bg-light border-bottom px-3 py-2">
-          @if (topic.queries.length === 0 && addingToTopicId !== topic.id) {
+          @if (topic.queries.length === 0 && state.addingToTopicId() !== topic.id) {
             <p class="text-muted small fst-italic mb-0 py-1">No queries yet. Click + Query to add one.</p>
           }
-
           @for (query of topic.queries; track query.id) {
-            @if (editingQueryId === query.id) {
-              <!-- Inline edit row -->
+            @if (state.editingQueryId() === query.id) {
               <div class="d-flex align-items-center gap-2 py-1 flex-wrap">
                 <input
-                  [(ngModel)]="editQueryText"
+                  [ngModel]="state.editQueryText()"
+                  (ngModelChange)="state.editQueryText.set($event)"
                   class="form-control form-control-sm"
                   style="max-width: 320px"
                   placeholder="Query text..."
-                  (keyup.enter)="saveEdit()"
-                  (keyup.escape)="cancelEdit()"
+                  (keyup.enter)="state.saveEdit()"
+                  (keyup.escape)="state.cancelEdit()"
                 />
                 <input
                   type="number"
-                  [(ngModel)]="editQueryPriority"
+                  [ngModel]="state.editQueryPriority()"
+                  (ngModelChange)="state.editQueryPriority.set($event)"
                   class="form-control form-control-sm"
                   style="width: 72px"
                   min="1" max="10"
                   title="Priority"
                 />
-                <button (click)="saveEdit()" class="btn btn-sm btn-success" [disabled]="!editQueryText.trim()">Save</button>
-                <button (click)="cancelEdit()" class="btn btn-sm btn-outline-secondary">Cancel</button>
+                <button (click)="state.saveEdit()" class="btn btn-sm btn-success" [disabled]="!state.editQueryText().trim()">Save</button>
+                <button (click)="state.cancelEdit()" class="btn btn-sm btn-outline-secondary">Cancel</button>
               </div>
             } @else {
-              <!-- Query display row -->
               <div class="d-flex align-items-center gap-2 py-1 border-bottom border-light-subtle">
                 <span class="badge bg-secondary-subtle text-secondary border" style="font-size: 0.65rem">P{{ query.priority }}</span>
                 <span
@@ -174,48 +159,40 @@
                 }
                 <div class="d-flex gap-1 flex-shrink-0">
                   <button
-                    (click)="toggleQuery(query)"
+                    (click)="state.toggleQuery(query)"
                     class="btn btn-sm btn-outline-secondary py-0 px-1"
                     style="font-size: 0.7rem"
                     [title]="query.isActive ? 'Pause' : 'Enable'"
-                  >{{ query.isActive ? '⏸' : '▶' }}</button>
-                  <button
-                    (click)="startEdit(query)"
-                    class="btn btn-sm btn-outline-primary py-0 px-1"
-                    style="font-size: 0.7rem"
-                  >Edit</button>
-                  <button
-                    (click)="deleteQuery(query.id)"
-                    class="btn btn-sm btn-outline-danger py-0 px-1"
-                    style="font-size: 0.7rem"
-                  >×</button>
+                  >{{ query.isActive ? '&#9208;' : '&#9654;' }}</button>
+                  <button (click)="state.startEdit(query)" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size: 0.7rem">Edit</button>
+                  <button (click)="state.deleteQuery(query.id)" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size: 0.7rem">&#x00D7;</button>
                 </div>
               </div>
             }
           }
-
-          <!-- Add query inline form -->
-          @if (addingToTopicId === topic.id) {
+          @if (state.addingToTopicId() === topic.id) {
             <div class="d-flex align-items-center gap-2 pt-2 flex-wrap">
               <input
-                [(ngModel)]="newQueryText"
+                [ngModel]="state.newQueryText()"
+                (ngModelChange)="state.newQueryText.set($event)"
                 class="form-control form-control-sm"
                 style="max-width: 320px"
                 placeholder="e.g. agentic AI LangGraph tutorial"
-                (keyup.enter)="addQuery(topic.id)"
-                (keyup.escape)="cancelAdd()"
+                (keyup.enter)="state.addQuery(topic.id)"
+                (keyup.escape)="state.cancelAdd()"
                 autofocus
               />
               <input
                 type="number"
-                [(ngModel)]="newQueryPriority"
+                [ngModel]="state.newQueryPriority()"
+                (ngModelChange)="state.newQueryPriority.set($event)"
                 class="form-control form-control-sm"
                 style="width: 72px"
                 min="1" max="10"
                 title="Priority"
               />
-              <button (click)="addQuery(topic.id)" class="btn btn-sm btn-danger" [disabled]="!newQueryText.trim()">Add</button>
-              <button (click)="cancelAdd()" class="btn btn-sm btn-outline-secondary">Cancel</button>
+              <button (click)="state.addQuery(topic.id)" class="btn btn-sm btn-danger" [disabled]="!state.newQueryText().trim()">Add</button>
+              <button (click)="state.cancelAdd()" class="btn btn-sm btn-outline-secondary">Cancel</button>
             </div>
           }
         </div>

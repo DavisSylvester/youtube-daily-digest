@@ -41,6 +41,7 @@ export const videos = sqliteTable('videos', {
   thumbnailUrl: text('thumbnail_url'),
   firstSeenAt: text('first_seen_at').notNull().default('CURRENT_TIMESTAMP'),
   isShort: integer('is_short').notNull().default(0),
+  defaultLanguage: text('default_language').notNull().default(''),
 });
 
 export const runVideos = sqliteTable('run_videos', {

@@ -17,6 +17,7 @@ export interface FoundVideo {
   readonly url: string;
   readonly queryText: string;
   readonly isShort: boolean;
+  readonly defaultLanguage: string;
 }
 
 interface SearchPage {
@@ -45,6 +46,7 @@ async function fetchPage(
     maxResults: 25,
     publishedAfter,
     pageToken,
+    relevanceLanguage: 'en',
   });
   return {
     items: res.data.items ?? [],
@@ -52,23 +54,42 @@ async function fetchPage(
   };
 }
 
-async function detectShorts(videoIds: readonly string[]): Promise<Set<string>> {
-  const shorts = new Set<string>();
+interface VideoDetails {
+  isShort: boolean;
+  defaultLanguage: string;
+}
+
+async function fetchVideoDetails(
+  videoIds: readonly string[],
+): Promise<Map<string, VideoDetails>> {
+  const result = new Map<string, VideoDetails>();
   const batchSize = 50;
+
   for (let i = 0; i < videoIds.length; i += batchSize) {
     const batch = videoIds.slice(i, i + batchSize);
     try {
-      const res = await youtube.videos.list({ part: ['contentDetails'], id: batch });
+      const res = await youtube.videos.list({
+        part: ['contentDetails', 'snippet'],
+        id: batch,
+      });
       for (const item of res.data.items ?? []) {
-        if (!item.id || !item.contentDetails?.duration) continue;
-        const secs = parseIsoDurationSeconds(item.contentDetails.duration);
-        if (secs > 0 && secs <= 60) shorts.add(item.id);
+        if (!item.id) continue;
+        const secs = item.contentDetails?.duration
+          ? parseIsoDurationSeconds(item.contentDetails.duration)
+          : 0;
+        const isShort = secs > 0 && secs <= 60;
+        const lang = (
+          item.snippet?.defaultAudioLanguage ??
+          item.snippet?.defaultLanguage ??
+          ''
+        ).toLowerCase();
+        result.set(item.id, { isShort, defaultLanguage: lang });
       }
     } catch {
-      // If contentDetails call fails, fall through — videos won't be marked as shorts
+      // batch failed — mark unknown
     }
   }
-  return shorts;
+  return result;
 }
 
 export async function searchNewVideos(
@@ -96,7 +117,8 @@ export async function searchNewVideos(
         thumbnailUrl: snippet.thumbnails?.medium?.url ?? undefined,
         url: `https://www.youtube.com/watch?v=${videoId}`,
         queryText,
-        isShort: false, // resolved below
+        isShort: false,
+        defaultLanguage: '',
       });
     }
 
@@ -106,13 +128,17 @@ export async function searchNewVideos(
 
   if (results.length === 0) return results;
 
-  // Detect Shorts: check #shorts tag first (no quota cost), then verify duration via API
-  const shortsByDuration = await detectShorts(results.map((v) => v.videoId));
+  const detailsMap = await fetchVideoDetails(results.map((v) => v.videoId));
 
-  return results.map((v) => ({
-    ...v,
-    isShort:
-      shortsByDuration.has(v.videoId) ||
-      /\#shorts?\b/i.test(`${v.title} ${v.description}`),
-  }));
+  return results.map((v) => {
+    const details = detailsMap.get(v.videoId);
+    const lang = details?.defaultLanguage ?? '';
+    const isShortByDuration = details?.isShort ?? false;
+    const isShortByTag = /\#shorts?\b/i.test(`${v.title} ${v.description}`);
+    return {
+      ...v,
+      isShort: isShortByDuration || isShortByTag,
+      defaultLanguage: lang,
+    };
+  });
 }

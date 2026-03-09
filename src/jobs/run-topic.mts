@@ -130,12 +130,16 @@ export async function runTopic(topicId: number, topicName: string): Promise<void
     const enriched: EnrichedVideo[] = [];
     for (const video of ruleRanked) {
       const assessment = await assessVideo({
-        topicName,
-        queryText: video.queryText,
+        searchContext: `${topicName} — ${video.queryText}`,
         title: video.title,
         description: video.description,
         channelTitle: video.channelTitle,
       });
+
+      if (!assessment.isEnglish) {
+        logger.info({ title: video.title, channel: video.channelTitle }, 'Rejected non-English video');
+        continue;
+      }
 
       const finalScore = video.ruleScore * RULE_WEIGHT + assessment.relevanceScore * LLM_WEIGHT;
 

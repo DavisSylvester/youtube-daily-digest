@@ -10,6 +10,7 @@ const model = new ChatOllama({
 });
 
 const VideoAssessmentSchema = z.object({
+  isEnglish: z.boolean(),
   relevanceScore: z.number().min(0).max(10),
   summary: z.string(),
   reason: z.string(),
@@ -21,8 +22,8 @@ export type VideoAssessmentResult = z.infer<typeof VideoAssessmentSchema>;
 const scorer = model.withStructuredOutput(VideoAssessmentSchema);
 
 export interface AssessVideoInput {
-  readonly topicName: string;
-  readonly queryText: string;
+  /** Combined context: "{topicName} — {queryText}" — single variable representing the full search intent. */
+  readonly searchContext: string;
   readonly title: string;
   readonly description: string;
   readonly channelTitle?: string;
@@ -30,7 +31,7 @@ export interface AssessVideoInput {
 
 export async function assessVideo(input: AssessVideoInput): Promise<VideoAssessmentResult> {
   logger.info(
-    { model: env.OLLAMA_MODEL, title: input.title, channel: input.channelTitle },
+    { model: env.OLLAMA_MODEL, searchContext: input.searchContext, title: input.title, channel: input.channelTitle },
     'LLM assess start',
   );
 
@@ -38,8 +39,9 @@ export async function assessVideo(input: AssessVideoInput): Promise<VideoAssessm
   const result = await scorer.invoke(
     `You are ranking YouTube videos for a user's personalized daily digest.
 
-Topic: ${input.topicName}
-Query matched: ${input.queryText}
+REQUIREMENT: ENGLISH ONLY. Set isEnglish=false and relevanceScore=0 for any video whose title or description is not primarily written in English. This is a hard requirement — non-English videos must be rejected regardless of content quality.
+
+Search context: ${input.searchContext}
 Title: ${input.title}
 Channel: ${input.channelTitle ?? 'Unknown'}
 Description: ${input.description}
@@ -57,6 +59,7 @@ Avoid:
 - spam
 - unrelated business news
 - generic AI clickbait
+- non-English videos (isEnglish must be false if title/description are not primarily English)
 
 Return structured output only.`,
   );
