@@ -1,4 +1,5 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal, computed, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiService } from './api.service';
 import type { Video } from '../models';
 
@@ -6,11 +7,21 @@ function todayString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** SQLite stores firstSeenAt as "2026-03-08 18:44:31" — normalize to ISO 8601 for DatePipe. */
+function normalizeVideo(v: Video): Video {
+  return {
+    ...v,
+    firstSeenAt: v.firstSeenAt.includes('T')
+      ? v.firstSeenAt
+      : v.firstSeenAt.replace(' ', 'T') + 'Z',
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class VideosStateService {
   private readonly api = inject(ApiService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  // ── State ──────────────────────────────────────────────────────────────────
   readonly videos = signal<Video[]>([]);
   readonly total = signal(0);
   readonly page = signal(1);
@@ -20,7 +31,6 @@ export class VideosStateService {
   readonly searchTerm = signal('');
   readonly selectedDate = signal(todayString());
 
-  // ── Derived ────────────────────────────────────────────────────────────────
   readonly filteredVideos = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
     const all = this.videos();
@@ -42,22 +52,25 @@ export class VideosStateService {
     return todayString();
   }
 
-  // ── Actions ────────────────────────────────────────────────────────────────
   loadVideos(): void {
     this.loading.set(true);
     this.error.set(null);
     const date = this.selectedDate();
-    this.api.getVideos(this.page(), this.pageSize(), date || undefined).subscribe({
-      next: (res) => {
-        this.videos.set(res.videos);
-        this.total.set(res.total);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.error.set('Failed to load videos. Is the API server running? (bun run dev:api)');
-        this.loading.set(false);
-      },
-    });
+    this.api
+      .getVideos(this.page(), this.pageSize(), date || undefined)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.videos.set(res.videos.map(normalizeVideo));
+          this.total.set(res.total);
+          this.loading.set(false);
+        },
+        error: (err: unknown) => {
+          console.error('[VideosStateService] loadVideos error:', err);
+          this.error.set('Failed to load videos. Is the API server running? (bun run dev:api)');
+          this.loading.set(false);
+        },
+      });
   }
 
   setSearchTerm(term: string): void {
