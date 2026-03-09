@@ -41,17 +41,6 @@
       placeholder="Filter by title or channel..."
     />
   </div>
-  <div class="col-auto d-flex align-items-center">
-    <button
-      class="btn btn-sm d-flex align-items-center gap-1"
-      [class]="state.englishOnly() ? 'btn-danger' : 'btn-outline-secondary'"
-      (click)="state.toggleEnglishOnly()"
-      title="Toggle English-only filter"
-    >
-      <span>&#127468;&#127463;</span>
-      <span>{{ state.englishOnly() ? 'English Only' : 'All Languages' }}</span>
-    </button>
-  </div>
 </div>
 
 @if (state.loading()) {
@@ -74,6 +63,7 @@
           <th>Channel</th>
           <th class="text-nowrap">Published</th>
           <th class="text-nowrap">First Seen</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -129,6 +119,14 @@
             <td class="text-muted small text-nowrap">
               {{ video.firstSeenAt | date : 'mediumDate' }}
             </td>
+            <td class="text-end">
+              <button
+                class="btn btn-sm btn-outline-danger py-0 px-2"
+                style="font-size: 0.75rem"
+                title="Delete video"
+                (click)="state.promptDelete(video)"
+              >&#x00D7;</button>
+            </td>
           </tr>
         }
       </tbody>
@@ -166,4 +164,65 @@
       </button>
     </div>
   }
+}
+
+<!-- Delete confirmation modal -->
+@if (state.deleteTarget()) {
+  <div
+    class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+    style="background: rgba(0,0,0,0.5); z-index: 1050"
+    (click)="state.cancelDelete()"
+  >
+    <div
+      class="card shadow-lg"
+      style="width: 480px; max-width: 95vw"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span class="fw-semibold text-danger">Delete Video</span>
+        <button
+          type="button"
+          class="btn-close"
+          (click)="state.cancelDelete()"
+          [disabled]="state.deleting()"
+        ></button>
+      </div>
+      <div class="card-body">
+        <p class="mb-1 small text-muted">You are about to permanently delete:</p>
+        <p class="fw-semibold mb-3">{{ state.deleteTarget()!.title }}</p>
+        <label class="form-label fw-semibold" for="deleteReason">
+          Reason <span class="text-danger">*</span>
+        </label>
+        <textarea
+          id="deleteReason"
+          class="form-control"
+          rows="3"
+          placeholder="Why is this video being deleted?"
+          [ngModel]="state.deleteReason()"
+          (ngModelChange)="state.deleteReason.set($event)"
+          (keyup.escape)="state.cancelDelete()"
+          [disabled]="state.deleting()"
+          autofocus
+        ></textarea>
+      </div>
+      <div class="card-footer d-flex justify-content-end gap-2">
+        <button
+          class="btn btn-outline-secondary"
+          (click)="state.cancelDelete()"
+          [disabled]="state.deleting()"
+        >Cancel</button>
+        <button
+          class="btn btn-danger"
+          (click)="state.confirmDelete()"
+          [disabled]="!state.deleteReason().trim() || state.deleting()"
+        >
+          @if (state.deleting()) {
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span>Deleting...
+          } @else {
+            Delete
+          }
+        </button>
+      </div>
+    </div>
+  </div>
 }

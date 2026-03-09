@@ -29,7 +29,9 @@ export class VideosStateService {
   readonly error = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly selectedDate = signal(todayString());
-  readonly englishOnly = signal(true);
+  readonly deleteTarget = signal<Video | null>(null);
+  readonly deleteReason = signal('');
+  readonly deleting = signal(false);
 
   readonly filteredVideos = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
@@ -57,7 +59,7 @@ export class VideosStateService {
     this.error.set(null);
     const date = this.selectedDate();
     this.api
-      .getVideos(this.page(), this.pageSize(), date || undefined, this.englishOnly())
+      .getVideos(this.page(), this.pageSize(), date || undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
@@ -77,12 +79,6 @@ export class VideosStateService {
     this.searchTerm.set(term);
   }
 
-  toggleEnglishOnly(): void {
-    this.englishOnly.update((v) => !v);
-    this.page.set(1);
-    this.loadVideos();
-  }
-
   onDateChange(date: string): void {
     this.selectedDate.set(date);
     this.page.set(1);
@@ -99,6 +95,41 @@ export class VideosStateService {
     this.selectedDate.set(todayString());
     this.page.set(1);
     this.loadVideos();
+  }
+
+  promptDelete(video: Video): void {
+    this.deleteTarget.set(video);
+    this.deleteReason.set('');
+  }
+
+  cancelDelete(): void {
+    this.deleteTarget.set(null);
+    this.deleteReason.set('');
+  }
+
+  confirmDelete(): void {
+    const video = this.deleteTarget();
+    const reason = this.deleteReason().trim();
+    if (!video || !reason) return;
+
+    this.deleting.set(true);
+    this.api
+      .deleteVideo(video.videoId, reason)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.videos.update((all) => all.filter((v) => v.videoId !== video.videoId));
+          this.total.update((n) => n - 1);
+          this.deleteTarget.set(null);
+          this.deleteReason.set('');
+          this.deleting.set(false);
+        },
+        error: (err: unknown) => {
+          console.error('[VideosStateService] deleteVideo error:', err);
+          this.error.set('Failed to delete video.');
+          this.deleting.set(false);
+        },
+      });
   }
 
   prevPage(): void {

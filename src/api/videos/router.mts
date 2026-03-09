@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { sql, or, eq } from 'drizzle-orm';
 import { db } from '../../repository/db.mts';
-import { videos } from '../../repository/schema.mts';
+import { ratings, runVideos, videos } from '../../repository/schema.mts';
 
 export const videosRouter = new Elysia().get(
   '/videos',
@@ -54,4 +54,33 @@ export const videosRouter = new Elysia().get(
     }),
     detail: { summary: 'Get videos filtered by date and/or language, paginated' },
   },
-);
+)
+  .delete(
+    '/videos/:videoId',
+    async ({ params, body, error: err }) => {
+      const { videoId } = params;
+
+      const existing = await db
+        .select({ videoId: videos.videoId })
+        .from(videos)
+        .where(eq(videos.videoId, videoId))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return err(404, { error: 'Video not found' });
+      }
+
+      db.transaction((tx) => {
+        tx.delete(runVideos).where(eq(runVideos.videoId, videoId)).run();
+        tx.delete(ratings).where(eq(ratings.videoId, videoId)).run();
+        tx.delete(videos).where(eq(videos.videoId, videoId)).run();
+      });
+
+      return { success: true, deletedVideoId: videoId };
+    },
+    {
+      params: t.Object({ videoId: t.String() }),
+      body: t.Object({ reason: t.String({ minLength: 1 }) }),
+      detail: { summary: 'Delete a video and its associated run_videos and ratings records' },
+    },
+  );
